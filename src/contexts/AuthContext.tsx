@@ -2,12 +2,22 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+export interface UserProfile {
+    id: string;
+    cargo: string;
+    departamento: string;
+    banco?: string;
+    agencia?: string;
+    conta?: string;
+    nome?: string;
+}
+
 interface AuthContextType {
     user: User | null;
     session: Session | null;
     loading: boolean;
     signOut: () => Promise<void>;
-    profile: Record<string, unknown> | null;
+    profile: UserProfile | null;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -21,10 +31,20 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
-    const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
+    const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Safety timeout: if auth takes too long (e.g., Supabase lock timeout), stop loading
+        const safetyTimeout = setTimeout(() => {
+            setLoading((prev) => {
+                if (prev) {
+                    console.warn('Auth loading timed out after 15s, forcing loading=false');
+                }
+                return false;
+            });
+        }, 15000);
+
         // Check active sessions and sets the user
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
@@ -34,6 +54,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             } else {
                 setLoading(false);
             }
+        }).catch((err) => {
+            console.error('Error getting session:', err);
+            setLoading(false);
         });
 
         // Listen for changes on auth state
@@ -51,6 +74,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         );
 
         return () => {
+            clearTimeout(safetyTimeout);
             authListener.subscription.unsubscribe();
         };
     }, []);
@@ -63,8 +87,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 .eq('id', userId)
                 .single();
 
-            if (error) throw error;
-            setProfile(data);
+            if (error) {
+                if (error.code === 'PGRST116') {
+                    console.warn('Profile not found yet for this user');
+                    setProfile(null);
+                } else {
+                    throw error;
+                }
+            } else {
+                setProfile(data);
+            }
         } catch (error) {
             console.error('Error fetching profile:', error);
         } finally {

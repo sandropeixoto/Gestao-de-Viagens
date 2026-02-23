@@ -66,10 +66,21 @@ export default function Dashboard() {
         }
     };
 
-    if (loading || !profile) {
+    if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <div className="flex justify-center items-center h-64">
+                <div className="text-center">
+                    <h2 className="text-xl font-bold text-gray-900">Perfil Incompleto</h2>
+                    <p className="mt-2 text-sm text-gray-500">Por favor, contate o administrador ("sandro.peixoto") para configurar seu cargo e departamento.</p>
+                </div>
             </div>
         );
     }
@@ -115,8 +126,8 @@ export default function Dashboard() {
                 <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
                     <div className="p-5">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-purple-100 rounded-md p-3">
-                                <CheckCircle className="h-6 w-6 text-purple-600" />
+                            <div className="flex-shrink-0 bg-emerald-100 rounded-md p-3">
+                                <CheckCircle className="h-6 w-6 text-emerald-600" />
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
@@ -131,7 +142,7 @@ export default function Dashboard() {
                     {(metrics?.aprovacoes_pendentes || 0) > 0 && (
                         <div className="bg-gray-50 px-5 py-3">
                             <div className="text-sm">
-                                <Link to="/aprovacoes" className="font-medium text-purple-600 hover:text-purple-900 flex items-center">
+                                <Link to="/aprovacoes" className="font-medium text-emerald-600 hover:text-emerald-900 flex items-center">
                                     Revisar agora <TrendingUp className="ml-1 h-4 w-4" />
                                 </Link>
                             </div>

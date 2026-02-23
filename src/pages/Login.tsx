@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { useEffect } from 'react';
 
 export default function Login() {
     const navigate = useNavigate();
@@ -10,6 +12,14 @@ export default function Login() {
     const [error, setError] = useState<string | null>(null);
     const [message, setMessage] = useState<string | null>(null);
 
+    const { user } = useAuth();
+
+    useEffect(() => {
+        if (user) {
+            navigate('/dashboard');
+        }
+    }, [user, navigate]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
@@ -17,21 +27,20 @@ export default function Login() {
         setMessage(null);
 
         // Business rule: Check suffix before touching Supabase Auth
-        if (!email.endsWith('@sefa.pa.gov.br')) {
+        const sanitizedEmail = email.trim().toLowerCase();
+        if (!sanitizedEmail.endsWith('@sefa.pa.gov.br')) {
             setError('Apenas e-mails corporativos da SEFA (@sefa.pa.gov.br) são permitidos.');
             setLoading(false);
             return;
         }
 
         const { error } = await supabase.auth.signInWithPassword({
-            email,
+            email: sanitizedEmail,
             password,
         });
 
         if (error) {
             setError(error.message);
-        } else {
-            navigate('/dashboard');
         }
         setLoading(false);
     };
@@ -41,14 +50,16 @@ export default function Login() {
         setError(null);
         setMessage(null);
 
-        if (!email.endsWith('@sefa.pa.gov.br')) {
+        const sanitizedEmail = email.trim().toLowerCase();
+
+        if (!sanitizedEmail.endsWith('@sefa.pa.gov.br')) {
             setError('Apenas e-mails corporativos da SEFA (@sefa.pa.gov.br) são permitidos para cadastro.');
             setLoading(false);
             return;
         }
 
         const { error } = await supabase.auth.signUp({
-            email,
+            email: sanitizedEmail,
             password,
         });
 

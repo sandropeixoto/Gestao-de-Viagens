@@ -29,6 +29,7 @@ export default function AccountabilityForm() {
 
     useEffect(() => {
         fetchRequests();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const fetchRequests = async () => {

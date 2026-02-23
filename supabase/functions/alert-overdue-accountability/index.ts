@@ -6,6 +6,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 serve(async (req) => {
     try {
         // Este código deve ser invocado via cron trigger do Supabase
@@ -63,6 +64,7 @@ serve(async (req) => {
             }),
             { headers: { "Content-Type": "application/json" } },
         )
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error("Erro ao rodar cron job:", error)
         return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } })

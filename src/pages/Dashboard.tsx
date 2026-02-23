@@ -25,12 +25,14 @@ export default function Dashboard() {
     const { profile, user } = useAuth();
     const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
     const [loading, setLoading] = useState(true);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [recentRequests, setRecentRequests] = useState<any[]>([]);
 
     useEffect(() => {
         if (user && profile) {
             fetchDashboardData();
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user, profile]);
 
     const fetchDashboardData = async () => {

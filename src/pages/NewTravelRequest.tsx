@@ -44,6 +44,7 @@ export default function NewTravelRequest() {
 
             // Ao salvar com sucesso, navega para o dashboard (ou listagem de viagens)
             navigate('/dashboard');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             console.error(err);
             setError(err.message || 'Erro ao criar a solicitação de viagem');

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { useNotification } from '../contexts/NotificationContext';
+import { CheckCircle2, XCircle, Clock, Paperclip, ExternalLink, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { getDocumentUrl } from '../lib/storage';
 
 type TravelRequest = {
     id: string;
@@ -13,36 +15,77 @@ type TravelRequest = {
     status: string;
     valor_previsto: number;
     profiles: {
+        id: string;
+        nome: string;
         departamento: string;
         cargo: string;
-        auth: { email?: string }; // Simulated join fetch
     };
+};
+
+type TravelDocument = {
+    id: string;
+    tipo: string;
+    storage_path: string;
 };
 
 export default function ApproverDashboard() {
     const { profile } = useAuth();
+    const { showNotification } = useNotification();
     const [requests, setRequests] = useState<TravelRequest[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Modal State
     const [selectedRequest, setSelectedRequest] = useState<TravelRequest | null>(null);
+    const [attachments, setAttachments] = useState<TravelDocument[]>([]);
     const [comment, setComment] = useState('');
     const [actionLoading, setActionLoading] = useState(false);
+
+    useEffect(() => {
+        if (selectedRequest) {
+            fetchAttachments(selectedRequest.id);
+        } else {
+            setAttachments([]);
+        }
+    }, [selectedRequest]);
+
+    const fetchAttachments = async (travelId: string) => {
+        const { data, error } = await supabase
+            .from('travel_documents')
+            .select('*')
+            .eq('travel_id', travelId);
+        if (!error) setAttachments(data || []);
+    };
 
     useEffect(() => {
         fetchRequests();
     }, []);
 
     const fetchRequests = async () => {
+        setLoading(true);
         try {
-            // Fetch pendings based on RLS (Aprovadores can see their department)
-            const { data, error } = await supabase
-                .from('travel_requests')
-                .select(`
-          *,
-          profiles (departamento, cargo)
-        `)
-                .in('status', ['Aguardando Chefia', 'Aguardando Subsecretario', 'Aguardando DAD']);
+             // Fetch pendings based on RLS (Aprovadores can see their department)
+             let query = supabase
+                 .from('travel_requests')
+                 .select(`
+           *,
+           profiles (id, nome, departamento, cargo)
+         `);
+
+             // Filter based on the approver's role
+             if (profile?.cargo === 'Chefia') {
+                 query = query.eq('status', 'Aguardando Chefia');
+             } else if (profile?.cargo === 'Subsecretário') {
+                 query = query.eq('status', 'Aguardando Subsecretário');
+             } else if (profile?.cargo === 'DAD') {
+                 query = query.in('status', ['Aguardando DAD', 'Aguardando Aprovação Prestação Contas']);
+             } else {
+                 // Devolve nada se não for aprovador conhecido
+                 setRequests([]);
+                 setLoading(false);
+                 return;
+             }
+
+             const { data, error } = await query;
 
             if (error) throw error;
             setRequests(data || []);
@@ -56,7 +99,7 @@ export default function ApproverDashboard() {
     const handleAction = async (action: 'Aprovado' | 'Devolvido') => {
         if (!selectedRequest || !profile) return;
         if (action === 'Devolvido' && !comment.trim()) {
-            alert('Motivo obrigatório para devolução.');
+            showNotification('Motivo obrigatório para devolução.', 'warning');
             return;
         }
 
@@ -71,8 +114,23 @@ export default function ApproverDashboard() {
                 comentarios: comment
             });
 
-            // 2. Update Request Status (Simplificada: se Chefia aprovou -> subsecretario, etc. Aqui vamos direto)
-            const newStatus = action === 'Aprovado' ? 'Aprovado' : 'Rejeitado';
+            // 2. Hierarchical Status Transition
+            let newStatus = selectedRequest.status;
+
+            if (action === 'Devolvido') {
+                newStatus = 'Devolvido para Correção';
+            } else {
+                // Approval Logic
+                if (selectedRequest.status === 'Aguardando Aprovação Prestação Contas') {
+                    newStatus = 'Concluido';
+                } else if (profile.cargo === 'Chefia') {
+                    newStatus = 'Aguardando Subsecretário';
+                } else if (profile.cargo === 'Subsecretário') {
+                    newStatus = 'Aguardando DAD';
+                } else if (profile.cargo === 'DAD') {
+                    newStatus = 'Aprovado';
+                }
+            }
 
             await supabase.from('travel_requests')
                 .update({ status: newStatus })
@@ -81,9 +139,10 @@ export default function ApproverDashboard() {
             setSelectedRequest(null);
             setComment('');
             fetchRequests();
+            showNotification(`Solicitação ${action === 'Aprovado' ? 'aprovada' : 'devolvida'} com sucesso!`, 'success');
         } catch (err) {
             console.error(err);
-            alert('Erro ao processar aprovação.');
+            showNotification('Erro ao processar ação.', 'error');
         } finally {
             setActionLoading(false);
         }
@@ -92,18 +151,25 @@ export default function ApproverDashboard() {
     if (loading) return <div>Carregando solicitações...</div>;
 
     return (
-        <div className="space-y-6">
-            <h1 className="text-2xl font-bold text-gray-900">Painel do Aprovador</h1>
-            <p className="text-gray-600">Confira as solicitações de viagem pendentes para o seu departamento.</p>
+        <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="relative pb-8 border-b border-slate-200">
+                <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+                    <LayoutDashboard className="text-accent-600 h-10 w-10" />
+                    Painel do Aprovador
+                </h1>
+                <p className="mt-4 text-lg text-slate-500 max-w-3xl">
+                    Gerencie e aprove solicitações de viagem do seu departamento com o fluxo de aprovação hierárquico.
+                </p>
+            </div>
 
-            <div className="bg-white shadow overflow-hidden sm:rounded-md mt-6 border border-gray-200">
+            <div className="glass-card overflow-hidden rounded-2xl mt-8">
                 <ul className="divide-y divide-gray-200">
                     {requests.length === 0 ? (
                         <li className="p-6 text-center text-gray-500">Não há viagens pendentes de aprovação no momento.</li>
                     ) : (
                         requests.map((req) => (
-                            <li key={req.id}>
-                                <div className="px-4 py-4 flex items-center sm:px-6 hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedRequest(req)}>
+                            <li key={req.id} className="group">
+                                <div className="px-8 py-6 flex items-center hover:bg-slate-50/50 cursor-pointer transition-all border-b border-slate-100 last:border-b-0" onClick={() => setSelectedRequest(req)}>
                                     <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between">
                                         <div>
                                             <p className="text-sm font-medium text-blue-600 truncate">{req.destino}</p>
@@ -131,25 +197,53 @@ export default function ApproverDashboard() {
             {/* Modal */}
             {selectedRequest && (
                 <div className="fixed inset-0 z-10 overflow-y-auto">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={() => !actionLoading && setSelectedRequest(null)} />
+                    <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity bg-slate-900/40 backdrop-blur-sm" onClick={() => !actionLoading && setSelectedRequest(null)} />
                         <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <h3 className="text-lg leading-6 font-medium text-gray-900 border-b pb-2">Detalhes da Solicitação</h3>
+                        <div className="inline-block align-bottom glass-modal rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl w-full border border-white/20">
+                            <div className="px-8 pt-8 pb-6">
+                                <h3 className="text-2xl font-bold text-slate-900 border-b border-slate-100 pb-4">Detalhes da Solicitação</h3>
                                 <div className="mt-4 space-y-3 text-sm text-gray-600">
                                     <p><strong>Destino:</strong> {selectedRequest.destino}</p>
                                     <p><strong>Período:</strong> {new Date(selectedRequest.data_ida).toLocaleDateString()} a {new Date(selectedRequest.data_retorno).toLocaleDateString()}</p>
                                     <p><strong>Fonte de Recurso:</strong> {selectedRequest.fonte_recurso}</p>
+                                    <p><strong>Solicitante:</strong> {selectedRequest.profiles?.nome || 'Não identificado'}</p>
                                     <p><strong>Justificativa:</strong> {selectedRequest.justificativa}</p>
+
+                                    {/* Attachment Section */}
+                                    <div className="mt-4">
+                                        <p className="font-semibold text-gray-900 flex items-center gap-2 mb-2">
+                                            <Paperclip size={16} /> Anexos ({attachments.length})
+                                        </p>
+                                        {attachments.length === 0 ? (
+                                            <p className="text-xs italic text-gray-400">Nenhum anexo enviado.</p>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-2">
+                                                {attachments.map(doc => (
+                                                    <button
+                                                        key={doc.id}
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            const url = await getDocumentUrl(doc.storage_path);
+                                                            window.open(url, '_blank');
+                                                        }}
+                                                        className="flex items-center justify-between p-2 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition-colors text-xs"
+                                                    >
+                                                        <span className="font-medium text-blue-700 capitalize">{doc.tipo}</span>
+                                                        <ExternalLink size={12} className="text-blue-500" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="mt-4 p-4 bg-gray-50 rounded-md border border-gray-200">
                                         <p className="font-semibold text-gray-900">Cálculo de Diárias Estimado</p>
                                         <p className="text-2xl text-blue-600 mt-1">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedRequest.valor_previsto)}</p>
                                     </div>
-                                    <div className="mt-4">
-                                        <label className="block text-sm font-medium text-gray-700">Comentários / Motivo da Devolução</label>
+                                    <div className="mt-6">
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">Comentários / Motivo da Devolução</label>
                                         <textarea
-                                            className="mt-1 w-full border border-gray-300 rounded-md p-2 focus:ring-blue-500 focus:border-blue-500"
+                                            className="w-full bg-slate-50/50 border border-slate-200 rounded-xl p-4 focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-all text-sm outline-none"
                                             rows={3}
                                             value={comment}
                                             onChange={(e) => setComment(e.target.value)}
@@ -158,7 +252,7 @@ export default function ApproverDashboard() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200">
+                            <div className="bg-slate-50/80 backdrop-blur-md px-8 py-6 sm:flex sm:flex-row-reverse border-t border-slate-100 gap-3">
                                 <button
                                     type="button"
                                     disabled={actionLoading}
@@ -179,7 +273,7 @@ export default function ApproverDashboard() {
                                                     data_retorno: selectedRequest.data_retorno,
                                                     fonte_recurso: selectedRequest.fonte_recurso,
                                                     profiles: {
-                                                        nome: selectedRequest.profiles?.auth?.email?.split('@')[0],
+                                                        nome: selectedRequest.profiles?.nome,
                                                     }
                                                 });
                                             });
@@ -214,9 +308,3 @@ export default function ApproverDashboard() {
     );
 }
 
-// Temporary ChevronRight icon since I forgot to import it above. Good practice is to put it here if missed.
-function ChevronRight(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-    );
-}

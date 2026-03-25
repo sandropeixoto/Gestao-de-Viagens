@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { UploadCloud, CheckSquare, Clock, AlertTriangle } from 'lucide-react';
+import { useNotification } from '../contexts/NotificationContext';
+import { UploadCloud, CheckSquare, Clock, AlertTriangle, FileCheck } from 'lucide-react';
+import { uploadTravelDocument } from '../lib/storage';
 
 type AccountabilityRequest = {
     id: string;
@@ -13,6 +15,7 @@ type AccountabilityRequest = {
 
 export default function AccountabilityForm() {
     const { user } = useAuth();
+    const { showNotification } = useNotification();
     const [requests, setRequests] = useState<AccountabilityRequest[]>([]);
     const [selectedReq, setSelectedReq] = useState<string | null>(null);
 
@@ -33,6 +36,7 @@ export default function AccountabilityForm() {
     }, [user]);
 
     const fetchRequests = async () => {
+        setLoading(true);
         try {
             // Find requests waiting for accountability for this user
             const { data, error } = await supabase
@@ -72,29 +76,37 @@ export default function AccountabilityForm() {
         if (!selectedReq) return;
 
         if (!checklist.bilhetes || !checklist.relatorio) {
-            alert("Por favor, confirme que enviou os bilhetes e o relatório.");
+            showNotification("Por favor, confirme que enviou os bilhetes e o relatório.", "warning");
             return;
         }
 
         if (files.length === 0) {
-            alert("Por favor, anexe os comprovantes necessários.");
+            showNotification("Por favor, anexe os comprovantes necessários.", "warning");
             return;
         }
 
         setSubmitting(true);
         try {
-            // 1. Simular Upload 
-            console.log(`Enviando ${files.length} arquivos para a prestação da viagem ${selectedReq}`);
+            // 1. Real Upload to Storage
+            const uploadPromises = files.map(file => {
+                // Determine type based on name or index for now, or just use 'prestacao_contas'
+                let type: 'comprovante' | 'bilhete' | 'relatorio' | 'prestacao_contas' = 'prestacao_contas';
+                if (file.name.toLowerCase().includes('bilhete')) type = 'bilhete';
+                if (file.name.toLowerCase().includes('relatorio')) type = 'relatorio';
+                
+                return uploadTravelDocument(user!.id, selectedReq, file, type);
+            });
+            await Promise.all(uploadPromises);
 
-            // 2. Mudar status para 'Aguardando Aprovação Prestação Contas' (Fluxo DAD)
+            // 2. Mudar status para 'Aguardando Aprovação Prestação Contas'
             const { error } = await supabase
                 .from('travel_requests')
-                .update({ status: 'Concluido' }) // Simplificado: Ideal ir para auditoria DAD
+                .update({ status: 'Aguardando Aprovação Prestação Contas' })
                 .eq('id', selectedReq);
 
             if (error) throw error;
 
-            alert('Prestação de contas enviada com sucesso!');
+            showNotification('Prestação de contas enviada com sucesso!', 'success');
 
             setSelectedReq(null);
             setChecklist({ bilhetes: false, relatorio: false, devolucao: false });
@@ -103,7 +115,7 @@ export default function AccountabilityForm() {
 
         } catch (err) {
             console.error(err);
-            alert('Erro ao enviar prestação de contas.');
+            showNotification('Erro ao enviar prestação de contas.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -112,18 +124,25 @@ export default function AccountabilityForm() {
     if (loading) return <div>Carregando...</div>;
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <h1 className="text-2xl font-bold text-gray-900">Prestação de Contas</h1>
-            <p className="text-gray-600">Envie seus comprovantes no prazo de 5 dias úteis após o retorno para evitar bloqueios no sistema.</p>
+        <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="relative pb-8 border-b border-slate-200">
+                <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+                    <FileCheck className="text-accent-600 h-10 w-10" />
+                    Prestação de Contas
+                </h1>
+                <p className="mt-4 text-lg text-slate-500 max-w-3xl">
+                    Envie seus comprovantes no prazo legal para evitar restrições administrativas.
+                </p>
+            </div>
 
             {requests.length === 0 ? (
-                <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center">
-                    <CheckSquare className="mx-auto h-12 w-12 text-green-500 mb-3" />
-                    <h3 className="text-lg font-medium text-gray-900">Tudo em dia!</h3>
-                    <p className="text-gray-500">Você não tem viagens pendentes de prestação de contas.</p>
+                <div className="glass-card p-12 rounded-3xl text-center border border-white/20 shadow-xl">
+                    <CheckSquare className="mx-auto h-16 w-16 text-emerald-500 mb-6 drop-shadow-sm" />
+                    <h3 className="text-2xl font-bold text-slate-900">Tudo em dia!</h3>
+                    <p className="text-slate-500 mt-2">Você não tem viagens pendentes de prestação de contas no momento.</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row">
+                <div className="glass-card rounded-3xl overflow-hidden flex flex-col md:flex-row border border-white/20 shadow-2xl">
                     {/* Lado Esquerdo: Viagens Pendentes */}
                     <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 bg-gray-50">
                         <h3 className="p-4 font-semibold text-gray-700 uppercase text-xs tracking-wider border-b border-gray-200">Viagens Pendentes</h3>
@@ -190,15 +209,15 @@ export default function AccountabilityForm() {
                                 {/* Drag and Drop Area */}
                                 <div>
                                     <h3 className="text-lg font-medium text-gray-900 border-b pb-2 mb-4">Upload de Comprovantes</h3>
-                                    <div className="border-2 border-dashed border-blue-300 bg-blue-50 rounded-lg p-8 text-center hover:bg-blue-100 transition-colors">
-                                        <UploadCloud className="mx-auto h-10 w-10 text-blue-500" />
-                                        <div className="mt-4 flex text-sm text-gray-600 justify-center">
-                                            <label htmlFor="accountability-upload" className="relative cursor-pointer bg-white px-2 py-1 rounded-md font-medium text-blue-600 shadow-sm border border-blue-200 hover:bg-blue-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                                    <div className="border-2 border-dashed border-accent-300 bg-accent-50/30 rounded-2xl p-10 text-center hover:bg-accent-50/50 transition-all group">
+                                        <UploadCloud className="mx-auto h-12 w-12 text-accent-500 group-hover:scale-110 transition-transform" />
+                                        <div className="mt-4 flex text-sm text-slate-600 justify-center">
+                                            <label htmlFor="accountability-upload" className="relative cursor-pointer bg-white px-4 py-2 rounded-xl font-bold text-accent-600 shadow-sm border border-accent-100 hover:bg-accent-50 transition-colors">
                                                 <span>Selecionar Arquivos</span>
                                                 <input id="accountability-upload" type="file" multiple className="sr-only" onChange={handleFileUpload} />
                                             </label>
                                         </div>
-                                        <p className="text-xs text-blue-700 mt-3 font-medium">Arraste seus PDFs e imagens aqui</p>
+                                        <p className="text-xs text-slate-500 mt-4">Arraste seus PDFs e imagens aqui</p>
                                     </div>
 
                                     {files.length > 0 && (

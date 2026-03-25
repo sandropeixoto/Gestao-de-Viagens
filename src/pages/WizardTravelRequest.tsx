@@ -4,8 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-react';
+import { uploadTravelDocument } from '../lib/storage';
 
 const travelSchema = z.object({
     origem: z.string().min(2, 'A origem é obrigatória'),
@@ -32,6 +34,7 @@ const STEPS = [
 
 export default function WizardTravelRequest() {
     const { user } = useAuth();
+    const { showNotification } = useNotification();
     const navigate = useNavigate();
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,6 +72,12 @@ export default function WizardTravelRequest() {
         setIsSubmitting(true);
         try {
             // 1. Insert Request
+            // Calcular valor previsto (exemplo: 250 por dia)
+            const dateIda = new Date(data.dataIda);
+            const dateRetorno = new Date(data.dataRetorno);
+            const diffDays = Math.ceil(Math.abs(dateRetorno.getTime() - dateIda.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const valorPrevisto = diffDays * 250;
+
             const { data: request, error: insertError } = await supabase.from('travel_requests').insert({
                 user_id: user?.id,
                 destino: data.destino,
@@ -76,21 +85,25 @@ export default function WizardTravelRequest() {
                 data_retorno: data.dataRetorno,
                 justificativa: `${data.justificativa} | Transporte: ${data.tipoTransporte} | Origem: ${data.origem} | Roteiro: ${data.roteiro}`,
                 fonte_recurso: data.fonteRecurso,
-                status: 'Rascunho' // Pode ser alterado para 'Aguardando Chefia' diretamente se desejar
+                valor_previsto: valorPrevisto,
+                status: 'Aguardando Chefia'
             }).select().single();
 
             if (insertError) throw insertError;
 
-            // 2. Simulated Upload (In a real scenario, map over files and upload to Storage)
+            // 2. Real Upload to Storage
             if (files.length > 0 && request) {
-                console.log(`Simulando upload de ${files.length} arquivo(s) para o ID: ${request.id}`);
-                // await supabase.storage.from('documents').upload(...)
+                const uploadPromises = files.map(file => 
+                    uploadTravelDocument(user!.id, request.id, file, 'comprovante')
+                );
+                await Promise.all(uploadPromises);
             }
 
             navigate('/dashboard');
+            showNotification('Solicitação enviada com sucesso!', 'success');
         } catch (err) {
             console.error(err);
-            alert('Erro ao criar solicitação.');
+            showNotification('Erro ao criar solicitação.', 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -106,27 +119,29 @@ export default function WizardTravelRequest() {
             </div>
 
             {/* Stepper Progress */}
-            <nav aria-label="Progress">
-                <ol className="flex items-center">
+            <nav aria-label="Progress" className="relative z-0">
+                <ol className="flex items-center justify-between w-full">
                     {STEPS.map((step, stepIdx) => (
-                        <li key={step.name} className={`relative ${stepIdx !== STEPS.length - 1 ? 'pr-8 sm:pr-20' : ''}`}>
-                            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                                <div className={`h-0.5 w-full ${currentStep > step.id ? 'bg-blue-600' : 'bg-gray-200'}`} />
-                            </div>
-                            <a
-                                className={`relative flex h-8 w-8 items-center justify-center rounded-full ${currentStep > step.id ? 'bg-blue-600 hover:bg-blue-900' :
-                                        currentStep === step.id ? 'border-2 border-blue-600 bg-white' : 'border-2 border-gray-300 bg-white hover:border-gray-400'
+                        <li key={step.name} className="relative flex flex-col items-center flex-1">
+                            {stepIdx !== STEPS.length - 1 && (
+                                <div className="absolute top-4 left-[50%] w-full h-0.5" aria-hidden="true">
+                                    <div className={`h-full transition-all duration-500 ${currentStep > step.id ? 'bg-accent-500' : 'bg-slate-200'}`} />
+                                </div>
+                            )}
+                            <div
+                                className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${currentStep > step.id ? 'bg-accent-600 shadow-lg shadow-accent-200' :
+                                        currentStep === step.id ? 'border-2 border-accent-600 bg-white ring-4 ring-accent-50' : 'border-2 border-slate-300 bg-white'
                                     }`}
                             >
                                 {currentStep > step.id ? (
-                                    <Check className="h-5 w-5 text-white" aria-hidden="true" />
+                                    <Check className="h-4 w-4 text-white" aria-hidden="true" />
                                 ) : (
-                                    <span className={`text-sm font-medium ${currentStep === step.id ? 'text-blue-600' : 'text-gray-500'}`}>
+                                    <span className={`text-xs font-bold ${currentStep === step.id ? 'text-accent-600' : 'text-slate-500'}`}>
                                         {step.id}
                                     </span>
                                 )}
-                            </a>
-                            <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs font-medium text-gray-500 whitespace-nowrap">
+                            </div>
+                            <span className={`mt-3 text-[10px] uppercase tracking-wider font-bold transition-colors ${currentStep === step.id ? 'text-accent-700' : 'text-slate-400'}`}>
                                 {step.name}
                             </span>
                         </li>
@@ -134,7 +149,7 @@ export default function WizardTravelRequest() {
                 </ol>
             </nav>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 mt-10">
+            <form onSubmit={handleSubmit(onSubmit)} className="glass-card rounded-3xl p-8 mt-12 border border-white/20 shadow-2xl">
                 {/* Step 1: Dados Básicos */}
                 {currentStep === 1 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">

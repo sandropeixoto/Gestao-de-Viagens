@@ -2,6 +2,20 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
+// ─── DEV MODE ────────────────────────────────────────────────────────────────
+// Set VITE_DEV_MODE=true in .env to bypass SSO and use a mock admin user.
+const DEV_MODE = import.meta.env.VITE_DEV_MODE === 'true';
+
+const MOCK_USER = {
+    id: '00000000-0000-0000-0000-000000000000',
+    email: 'sandro.peixoto@sefa.pa.gov.br',
+    role: 'authenticated',
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+} as unknown as User;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface UserProfile {
     id: string;
     cargo: string;
@@ -29,12 +43,18 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(DEV_MODE ? MOCK_USER : null);
     const [session, setSession] = useState<Session | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (DEV_MODE) {
+            console.info('[DEV_MODE] Auth bypass active. Logged in as:', MOCK_USER.email);
+            fetchProfile(MOCK_USER.id);
+            return;
+        }
+
         // Safety timeout: if auth takes too long (e.g., Supabase lock timeout), stop loading
         const safetyTimeout = setTimeout(() => {
             setLoading((prev) => {

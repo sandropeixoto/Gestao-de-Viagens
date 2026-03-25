@@ -90,59 +90,58 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 animate-in fade-in duration-700">
             {/* Cabeçalho */}
-            <div className="pb-5 border-b border-gray-200">
-                <h1 className="text-3xl font-bold leading-tight text-gray-900">
-                    Bem-vindo de volta, {profile?.nome || user?.email?.split('@')[0]}
+            <div className="relative pb-8 border-b border-slate-200">
+                <h1 className="text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">
+                    Bem-vindo, <span className="text-accent-600">{profile?.nome || user?.email?.split('@')[0]}</span>
                 </h1>
-                <p className="mt-2 text-sm text-gray-500">
-                    Aqui está o resumo do seu painel nesta semana interagindo como <strong>{profile?.cargo}</strong> do {profile?.departamento}.
+                <p className="mt-4 text-lg text-slate-500 max-w-3xl">
+                    Resumo do seu painel como <span className="font-semibold text-slate-700">{profile?.cargo}</span> do {profile?.departamento}.
                 </p>
             </div>
-
             {/* Grid de Cards Principais */}
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                 {/* Card 1: Viagens em Andamento */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
-                    <div className="p-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
-                                <Luggage className="h-6 w-6 text-blue-600" />
-                            </div>
-                            <div className="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Viagens em Andamento</dt>
-                                    <dd className="flex items-baseline">
-                                        <div className="text-2xl font-semibold text-gray-900">{metrics?.viagens_andamento || 0}</div>
-                                    </dd>
-                                </dl>
-                            </div>
+                <div className="glass-card overflow-hidden rounded-2xl p-6 relative group">
+                    <div className="absolute inset-0 bg-accent-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0 bg-blue-50/50 backdrop-blur-sm rounded-xl p-3 border border-blue-100">
+                            <Luggage className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-slate-500 truncate">Viagens em Andamento</dt>
+                                <dd className="flex items-baseline">
+                                    <div className="text-3xl font-bold text-slate-900">{metrics?.viagens_andamento || 0}</div>
+                                </dd>
+                            </dl>
                         </div>
                     </div>
                 </div>
 
                 {/* Card 2: Aprovações Pendentes */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
-                    <div className="p-5">
+                <div className="glass-card overflow-hidden rounded-2xl relative group flex flex-col">
+                    <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="p-6 flex-1">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-emerald-100 rounded-md p-3">
+                            <div className="flex-shrink-0 bg-emerald-50/50 backdrop-blur-sm rounded-xl p-3 border border-emerald-100">
                                 <CheckCircle className="h-6 w-6 text-emerald-600" />
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Aprovações Pendentes</dt>
+                                    <dt className="text-sm font-medium text-slate-500 truncate">Aprovações Pendentes</dt>
                                     <dd className="flex items-baseline">
-                                        <div className="text-2xl font-semibold text-gray-900">{metrics?.aprovacoes_pendentes || 0}</div>
+                                        <div className="text-3xl font-bold text-slate-900">{metrics?.aprovacoes_pendentes || 0}</div>
                                     </dd>
                                 </dl>
                             </div>
                         </div>
                     </div>
                     {(metrics?.aprovacoes_pendentes || 0) > 0 && (
-                        <div className="bg-gray-50 px-5 py-3">
+                        <div className="bg-emerald-50/50 backdrop-blur-sm px-6 py-3 border-t border-emerald-100">
                             <div className="text-sm">
-                                <Link to="/aprovacoes" className="font-medium text-emerald-600 hover:text-emerald-900 flex items-center">
+                                <Link to="/aprovacoes" className="font-semibold text-emerald-700 hover:text-emerald-900 flex items-center">
                                     Revisar agora <TrendingUp className="ml-1 h-4 w-4" />
                                 </Link>
                             </div>
@@ -151,30 +150,31 @@ export default function Dashboard() {
                 </div>
 
                 {/* Card 3: Prestações Pendentes */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow relative">
+                <div className="glass-card overflow-hidden rounded-2xl relative group flex flex-col">
+                    <div className="absolute inset-0 bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
                     {(metrics?.prestacoes_pendentes || 0) > 0 && (
-                        <div className="absolute top-0 right-0 -tr-xl -br-xl w-2 h-full bg-red-500"></div>
+                        <div className="absolute top-0 right-0 w-1.5 h-full bg-red-500/40 animate-pulse"></div>
                     )}
-                    <div className="p-5">
+                    <div className="p-6 flex-1">
                         <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-red-100 rounded-md p-3">
+                            <div className="flex-shrink-0 bg-red-50/50 backdrop-blur-sm rounded-xl p-3 border border-red-100">
                                 <AlertTriangle className="h-6 w-6 text-red-600" />
                             </div>
                             <div className="ml-5 w-0 flex-1">
                                 <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Prestações Pendentes</dt>
+                                    <dt className="text-sm font-medium text-slate-500 truncate">Prestações Pendentes</dt>
                                     <dd className="flex items-baseline">
-                                        <div className="text-2xl font-semibold text-gray-900">{metrics?.prestacoes_pendentes || 0}</div>
+                                        <div className="text-3xl font-bold text-slate-900">{metrics?.prestacoes_pendentes || 0}</div>
                                     </dd>
                                 </dl>
                             </div>
                         </div>
                     </div>
                     {(metrics?.prestacoes_pendentes || 0) > 0 && (
-                        <div className="bg-red-50 px-5 py-3">
+                        <div className="bg-red-50/50 backdrop-blur-sm px-6 py-3 border-t border-red-100">
                             <div className="text-sm">
-                                <Link to="/prestacao-contas" className="font-medium text-red-700 hover:text-red-900">
-                                    Ação imediata necessária (Atrasadas)
+                                <Link to="/prestacao-contas" className="font-semibold text-red-700 hover:text-red-900">
+                                    Ação imediata necessária
                                 </Link>
                             </div>
                         </div>
@@ -182,20 +182,19 @@ export default function Dashboard() {
                 </div>
 
                 {/* Card 4: Gasto Total */}
-                <div className="bg-white overflow-hidden shadow-sm rounded-xl border border-gray-100 hover:shadow-md transition-shadow">
-                    <div className="p-5">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0 bg-green-100 rounded-md p-3">
-                                <DollarSign className="h-6 w-6 text-green-600" />
-                            </div>
-                            <div className="ml-5 w-0 flex-1">
-                                <dl>
-                                    <dt className="text-sm font-medium text-gray-500 truncate">Total Gasto (Mês)</dt>
-                                    <dd className="flex items-baseline">
-                                        <div className="text-2xl font-bold text-gray-900">{formatCurrency(metrics?.total_gasto_mes || 0)}</div>
-                                    </dd>
-                                </dl>
-                            </div>
+                <div className="glass-card overflow-hidden rounded-2xl p-6 relative group">
+                    <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0 bg-green-50/50 backdrop-blur-sm rounded-xl p-3 border border-green-100">
+                            <DollarSign className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div className="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt className="text-sm font-medium text-slate-500 truncate">Total Gasto (Mês)</dt>
+                                <dd className="flex items-baseline">
+                                    <div className="text-2xl font-extrabold text-slate-900 tracking-tight">{formatCurrency(metrics?.total_gasto_mes || 0)}</div>
+                                </dd>
+                            </dl>
                         </div>
                     </div>
                 </div>
@@ -205,8 +204,11 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
 
                 {/* Esquerda: Agrupamento por Fonte */}
-                <div className="lg:col-span-2 bg-white shadow-sm rounded-xl border border-gray-100 p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Execução Financeira por Fonte (R$)</h3>
+                <div className="lg:col-span-2 glass-card rounded-2xl p-8">
+                    <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <TrendingUp className="text-accent-500" />
+                        Execução Financeira por Fonte
+                    </h3>
 
                     {metrics?.fontes_recurso && metrics.fontes_recurso.length > 0 ? (
                         <div className="space-y-4">
@@ -234,8 +236,8 @@ export default function Dashboard() {
                 </div>
 
                 {/* Direita: Ações Rápidas */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Tarefas Rápidas</h3>
+                <div className="glass-card rounded-2xl p-8">
+                    <h3 className="text-xl font-bold text-slate-900 mb-6">Tarefas Rápidas</h3>
                     <div className="space-y-3">
                         <Link to="/solicitar" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-blue-50 hover:border-blue-200 transition-colors group">
                             <PlusCircle className="h-6 w-6 text-gray-400 group-hover:text-blue-600 mr-3" />
@@ -257,9 +259,9 @@ export default function Dashboard() {
             </div>
 
             {/* Lista Inferior: Recentes */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden mt-8">
-                <div className="px-6 py-5 border-b border-gray-200">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Solicitações Recentes</h3>
+            <div className="glass-card rounded-2xl overflow-hidden mt-8">
+                <div className="px-8 py-6 border-b border-slate-200 bg-white/30">
+                    <h3 className="text-xl font-bold text-slate-900">Solicitações Recentes</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import { Check, ChevronRight, ChevronLeft, UploadCloud } from 'lucide-react';
+import { Check, ChevronRight, ChevronLeft, UploadCloud, Loader2 } from 'lucide-react';
 import { uploadTravelDocument } from '../lib/storage';
 
 const travelSchema = z.object({
@@ -16,7 +16,7 @@ const travelSchema = z.object({
     dataRetorno: z.string().min(1, 'Data de retorno é obrigatória'),
     justificativa: z.string().min(5, 'A justificativa é obrigatória'),
     fonteRecurso: z.enum(['Tesouro', 'FIPAT', 'BID']),
-    tipoTransporte: z.string().min(2, 'O transporte é obrigatório'),
+    tipoTransporte: z.string().min(1, 'O transporte é obrigatório'),
     roteiro: z.string().min(5, 'Descreva o roteiro.'),
 }).refine((data) => new Date(data.dataRetorno) >= new Date(data.dataIda), {
     message: "A data de retorno não pode ser anterior à ida",
@@ -39,6 +39,8 @@ export default function WizardTravelRequest() {
     const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [files, setFiles] = useState<File[]>([]);
+    const [transportTypes, setTransportTypes] = useState<{ id: string; name: string }[]>([]);
+    const [loadingTransport, setLoadingTransport] = useState(true);
 
     const { register, handleSubmit, trigger, formState: { errors } } = useForm<TravelFormData>({
         resolver: zodResolver(travelSchema),
@@ -46,6 +48,28 @@ export default function WizardTravelRequest() {
             fonteRecurso: 'Tesouro',
         }
     });
+
+    useEffect(() => {
+        fetchTransportTypes();
+    }, []);
+
+    const fetchTransportTypes = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('transport_types')
+                .select('id, name')
+                .eq('active', true)
+                .order('name');
+            
+            if (error) throw error;
+            setTransportTypes(data || []);
+        } catch (err) {
+            console.error('Error fetching transport types:', err);
+            showNotification('Erro ao carregar tipos de transporte.', 'error');
+        } finally {
+            setLoadingTransport(false);
+        }
+    };
 
     const nextStep = async () => {
         let fieldsToValidate: (keyof TravelFormData)[] = [];
@@ -61,7 +85,6 @@ export default function WizardTravelRequest() {
 
     const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
-    // Hook simulado de upload
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setFiles(Array.from(e.target.files));
@@ -71,8 +94,6 @@ export default function WizardTravelRequest() {
     const onSubmit = async (data: TravelFormData) => {
         setIsSubmitting(true);
         try {
-            // 1. Insert Request
-            // Calcular valor previsto (exemplo: 250 por dia)
             const dateIda = new Date(data.dataIda);
             const dateRetorno = new Date(data.dataRetorno);
             const diffDays = Math.ceil(Math.abs(dateRetorno.getTime() - dateIda.getTime()) / (1000 * 60 * 60 * 24)) + 1;
@@ -97,7 +118,6 @@ export default function WizardTravelRequest() {
                 throw insertError;
             }
 
-            // 2. Real Upload to Storage
             if (files.length > 0 && request) {
                 const uploadPromises = files.map(file => 
                     uploadTravelDocument(user!.id, request.id, file, 'comprovante')
@@ -124,7 +144,6 @@ export default function WizardTravelRequest() {
                 </div>
             </div>
 
-            {/* Stepper Progress */}
             <nav aria-label="Progress" className="relative z-0">
                 <ol className="flex items-center justify-between w-full">
                     {STEPS.map((step, stepIdx) => (
@@ -156,7 +175,6 @@ export default function WizardTravelRequest() {
             </nav>
 
             <form onSubmit={handleSubmit(onSubmit)} className="glass-card rounded-3xl p-8 mt-12 border border-white/20 shadow-2xl">
-                {/* Step 1: Dados Básicos */}
                 {currentStep === 1 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                         <h2 className="text-xl font-medium text-gray-900 border-b pb-2">Dados Básicos</h2>
@@ -185,7 +203,6 @@ export default function WizardTravelRequest() {
                     </div>
                 )}
 
-                {/* Step 2: Detalhes */}
                 {currentStep === 2 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                         <h2 className="text-xl font-medium text-gray-900 border-b pb-2">Detalhes Institucionais</h2>
@@ -207,14 +224,29 @@ export default function WizardTravelRequest() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Transporte</label>
-                                <input {...register('tipoTransporte')} className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Aéreo, Terrestre, Veículo Oficial..." />
+                                <div className="relative">
+                                    <select 
+                                        {...register('tipoTransporte')} 
+                                        disabled={loadingTransport}
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white appearance-none"
+                                    >
+                                        <option value="">Selecione um transporte...</option>
+                                        {transportTypes.map(t => (
+                                            <option key={t.id} value={t.name}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                    {loadingTransport && (
+                                        <div className="absolute right-3 top-2.5">
+                                            <Loader2 className="animate-spin h-4 w-4 text-gray-400" />
+                                        </div>
+                                    )}
+                                </div>
                                 {errors.tipoTransporte && <p className="mt-1 text-sm text-red-600">{errors.tipoTransporte.message}</p>}
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* Step 3: Roteiro */}
                 {currentStep === 3 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                         <h2 className="text-xl font-medium text-gray-900 border-b pb-2">Roteiro Detalhado</h2>
@@ -226,7 +258,6 @@ export default function WizardTravelRequest() {
                     </div>
                 )}
 
-                {/* Step 4: Anexos */}
                 {currentStep === 4 && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                         <h2 className="text-xl font-medium text-gray-900 border-b pb-2">Anexos e Documentos</h2>
@@ -254,7 +285,6 @@ export default function WizardTravelRequest() {
                     </div>
                 )}
 
-                {/* Navigation Buttons */}
                 <div className="mt-8 pt-6 border-t border-gray-100 flex justify-between">
                     <button
                         type="button"

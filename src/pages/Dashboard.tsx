@@ -51,7 +51,7 @@ export default function Dashboard() {
             // Fetch recent requests (limit 5)
             const { data: recentData, error: recentError } = await supabase
                 .from('travel_requests')
-                .select('id, destino, data_ida, status, valor_previsto')
+                .select('id, destino, data_ida, data_retorno, status, valor_previsto')
                 .eq('user_id', user?.id)
                 .order('created_at', { ascending: false })
                 .limit(5);
@@ -290,6 +290,20 @@ export default function Dashboard() {
                                             }`}>
                                             {req.status}
                                         </span>
+                                        {req.status === 'Aguardando Prestacao de Contas' && (
+                                            (() => {
+                                                const returnDate = new Date(req.data_retorno || req.data_ida);
+                                                const dueDate = new Date(returnDate);
+                                                dueDate.setDate(dueDate.getDate() + 5);
+                                                const isOverdue = new Date() > dueDate;
+
+                                                return isOverdue ? (
+                                                    <div className="mt-1 flex items-center gap-1 text-[10px] text-red-600 font-black uppercase animate-pulse">
+                                                        <AlertTriangle size={10} /> Prazo Excedido
+                                                    </div>
+                                                ) : null;
+                                            })()
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right font-medium">
                                         {formatCurrency(req.valor_previsto)}

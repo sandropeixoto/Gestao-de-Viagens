@@ -89,7 +89,13 @@ export default function WizardTravelRequest() {
                 status: 'Aguardando Chefia'
             }).select().single();
 
-            if (insertError) throw insertError;
+            if (insertError) {
+                if (insertError.message.includes('servidor já possui uma viagem agendada')) {
+                    showNotification('Conflito de Datas: Você já possui uma viagem aprovada ou pendente para este período.', 'error');
+                    return;
+                }
+                throw insertError;
+            }
 
             // 2. Real Upload to Storage
             if (files.length > 0 && request) {

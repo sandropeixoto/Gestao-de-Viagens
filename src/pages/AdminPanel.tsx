@@ -9,6 +9,8 @@ type DiemRate = {
     destino: string;
     cargo: string;
     valor: number;
+    status: string;
+    effective_from: string;
     updated_at: string;
 };
 
@@ -24,7 +26,9 @@ export default function AdminPanel() {
     const [formData, setFormData] = useState({
         destino: '',
         cargo: '',
-        valor: ''
+        valor: '',
+        status: 'active',
+        effective_from: new Date().toISOString().split('T')[0]
     });
 
     useEffect(() => {
@@ -60,7 +64,9 @@ export default function AdminPanel() {
             const payload = {
                 destino: formData.destino,
                 cargo: formData.cargo,
-                valor: parseFloat(formData.valor)
+                valor: parseFloat(formData.valor),
+                status: formData.status,
+                effective_from: formData.effective_from
             };
 
             if (id) {
@@ -80,7 +86,7 @@ export default function AdminPanel() {
 
             setEditingId(null);
             setIsAdding(false);
-            setFormData({ destino: '', cargo: '', valor: '' });
+            setFormData({ destino: '', cargo: '', valor: '', status: 'active', effective_from: new Date().toISOString().split('T')[0] });
             fetchRates();
         } catch (err: any) {
             console.error(err);
@@ -111,7 +117,9 @@ export default function AdminPanel() {
         setFormData({
             destino: rate.destino,
             cargo: rate.cargo,
-            valor: rate.valor.toString()
+            valor: rate.valor.toString(),
+            status: rate.status || 'active',
+            effective_from: rate.effective_from ? new Date(rate.effective_from).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
         });
     };
 
@@ -231,13 +239,35 @@ export default function AdminPanel() {
                                         className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 outline-none transition-all font-medium"
                                     />
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cargo/Nível</label>
+                                        <input
+                                            type="text"
+                                            value={formData.cargo}
+                                            onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
+                                            placeholder="Ex: Auditor"
+                                            className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 outline-none transition-all font-medium"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Status</label>
+                                        <select
+                                            value={formData.status}
+                                            onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                                            className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 outline-none transition-all font-bold text-slate-700 appearance-none shadow-sm cursor-pointer"
+                                        >
+                                            <option value="active">Ativo</option>
+                                            <option value="inactive">Inativo</option>
+                                        </select>
+                                    </div>
+                                </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Cargo/Nível</label>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Data de Vigência</label>
                                     <input
-                                        type="text"
-                                        value={formData.cargo}
-                                        onChange={(e) => setFormData({ ...formData, cargo: e.target.value })}
-                                        placeholder="Ex: Auditor, Chefia, Consultor"
+                                        type="date"
+                                        value={formData.effective_from}
+                                        onChange={(e) => setFormData({ ...formData, effective_from: e.target.value })}
                                         className="w-full px-4 py-3 bg-white/50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 outline-none transition-all font-medium"
                                     />
                                 </div>
@@ -261,7 +291,7 @@ export default function AdminPanel() {
                                     onClick={() => handleSave(editingId || undefined)}
                                     className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-bold hover:bg-black transition-all shadow-lg flex items-center justify-center gap-2"
                                 >
-                                    <Save size={18} /> Salvar Regra
+                                    <Save size={18} /> Salvar Alterações
                                 </button>
                             </div>
                         </div>

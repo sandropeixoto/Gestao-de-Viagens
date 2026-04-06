@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import { CheckCircle2, XCircle, Clock, Paperclip, ExternalLink, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Paperclip, ExternalLink, ChevronRight, LayoutDashboard, AlertTriangle } from 'lucide-react';
 import { getDocumentUrl } from '../lib/storage';
 
 type TravelRequest = {
@@ -20,6 +20,7 @@ type TravelRequest = {
         departamento: string;
         cargo: string;
     };
+    alert_flags: Record<string, any>;
 };
 
 type TravelDocument = {
@@ -177,6 +178,12 @@ export default function ApproverDashboard() {
                                                 <Clock className="flex-shrink-0 mr-1.5 h-4 w-4 text-amber-400" />
                                                 <span className="truncate">{req.status}</span>
                                             </p>
+                                            {req.alert_flags && Object.keys(req.alert_flags).length > 0 && (
+                                                <div className="mt-2 flex items-center gap-1.5 px-2 py-1 bg-red-50 text-red-700 rounded-lg w-fit border border-red-100">
+                                                    <AlertTriangle size={12} className="animate-pulse" />
+                                                    <span className="text-[10px] font-black uppercase tracking-wider">Alerta de Auditoria</span>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="mt-4 flex-shrink-0 sm:mt-0 sm:ml-5">
                                             <div className="flex space-x-2 text-sm text-gray-900 font-semibold">
@@ -240,6 +247,17 @@ export default function ApproverDashboard() {
                                         <p className="font-semibold text-gray-900">Cálculo de Diárias Estimado</p>
                                         <p className="text-2xl text-blue-600 mt-1">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedRequest.valor_previsto)}</p>
                                     </div>
+                                    {selectedRequest.alert_flags && Object.keys(selectedRequest.alert_flags).length > 0 && (
+                                        <div className="mt-4 p-4 bg-red-50 rounded-2xl border border-red-200 space-y-2">
+                                            <p className="font-bold text-red-900 flex items-center gap-2">
+                                                <AlertTriangle size={18} /> Alertas de Auditoria Inteligente
+                                            </p>
+                                            <ul className="text-xs text-red-700 list-disc list-inside space-y-1">
+                                                {selectedRequest.alert_flags.retroactive && <li><strong>Solicitação Retroativa:</strong> Criada com menos de 3 dias de antecedência.</li>}
+                                                {selectedRequest.alert_flags.overlap && <li><strong>Conflito de Datas:</strong> Possível sobreposição com outra viagem.</li>}
+                                            </ul>
+                                        </div>
+                                    )}
                                     <div className="mt-6">
                                         <label className="block text-sm font-semibold text-slate-700 mb-2">Comentários / Motivo da Devolução</label>
                                         <textarea
